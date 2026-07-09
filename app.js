@@ -80,7 +80,129 @@ function likePost(postKey) {
 }
 
 // ==========================================
-// 2. TÉLÉVERSEMENT DE MÉDIAS (POST CREATION)
+// 2. // ==========================================
+// 2. SYSTÈME DE TÉLÉVERSEMENT AVANCÉ AVEC APERÇU
+// ==========================================
+
+// Initialise les écouteurs pour la zone d'aperçu dès le chargement
+document.addEventListener("DOMContentLoaded", () => {
+    setupUploadPreview();
+});
+
+function setupUploadPreview() {
+    const fileSelector = document.getElementById("file-selector");
+    if (!fileSelector) return;
+
+    // Écouteur pour afficher l'aperçu dès qu'un fichier est sélectionné
+    fileSelector.addEventListener("change", function() {
+        const file = this.files[0];
+        const previewContainer = document.getElementById("upload-preview-container") || createPreviewContainer();
+        
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewContainer.innerHTML = ""; // On vide l'ancien aperçu
+                
+                if (file.type.startsWith("video/")) {
+                    previewContainer.innerHTML = `<video src="${e.target.result}" controls style="width:100%; max-height:250px; object-fit:cover; border-radius:8px;"></video>`;
+                } else {
+                    previewContainer.innerHTML = `<img src="${e.target.result}" style="width:100%; max-height:250px; object-fit:cover; border-radius:8px;">`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function createPreviewContainer() {
+    const uploadBox = document.querySelector(".upload-box");
+    const container = document.createElement("div");
+    container.id = "upload-preview-container";
+    container.style.width = "100%";
+    container.style.marginTop = "10px";
+    container.style.textAlign = "center";
+    
+    // Insérer la zone d'aperçu juste avant la zone de texte de la légende
+    const caption = document.getElementById("post-caption");
+    uploadBox.insertBefore(container, caption);
+    return container;
+}
+
+// Nouvelle fonction de publication avec barre de progression en temps réel
+function handlePublish() {
+    const fileSelector = document.getElementById("file-selector");
+    const captionText = document.getElementById("post-caption");
+    const publishBtn = document.getElementById("btn-publish");
+
+    if (!fileSelector || fileSelector.files.length === 0) {
+        alert("Veuillez sélectionner une photo ou une vidéo avant de publier.");
+        return;
+    }
+
+    const file = fileSelector.files[0];
+    publishBtn.disabled = true;
+
+    // Création ou récupération de la barre de progression visuelle
+    let progressBar = document.getElementById("upload-progress-bar");
+    if (!progressBar) {
+        progressBar = document.createElement("div");
+        progressBar.id = "upload-progress-bar";
+        progressBar.style.width = "0%";
+        progressBar.style.height = "4px";
+        progressBar.style.backgroundColor = "#0095f6";
+        progressBar.style.transition = "width 0.1s linear";
+        progressBar.style.borderRadius = "2px";
+        progressBar.style.marginTop = "8px";
+        publishBtn.parentNode.insertBefore(progressBar, publishBtn.nextSibling);
+    }
+
+    // Lancement du téléversement vers Firebase Storage
+    const storageRef = storage.ref(`uploads/${Date.now()}_${file.name}`);
+    const uploadTask = storageRef.put(file);
+
+    // Suivi de la progression pas à pas
+    uploadTask.on("state_changed", 
+        (snapshot) => {
+            // Calcul du pourcentage envoyé
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            progressBar.style.width = progress + "%";
+            publishBtn.innerText = `Téléversement : ${Math.round(progress)}%`;
+        }, 
+        (error) => {
+            alert("Erreur lors du téléversement : " + error.message);
+            publishBtn.innerText = "Partager";
+            publishBtn.disabled = false;
+            progressBar.style.width = "0%";
+        }, 
+        () => {
+            // Téléversement réussi, récupération du lien public sécurisé
+            uploadTask.snapshot.ref.getDownloadURL().then((downloadUrl) => {
+                // Liaison immédiate avec la base de données
+                db.ref("posts").push({
+                    author: currentSessionUser,
+                    mediaUrl: downloadUrl,
+                    mediaType: file.type,
+                    caption: captionText.value.trim(),
+                    likes: 0,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                    // Nettoyage complet de la zone après publication réussie
+                    captionText.value = "";
+                    fileSelector.value = "";
+                    progressBar.style.width = "0%";
+                    const previewContainer = document.getElementById("upload-preview-container");
+                    if (previewContainer) previewContainer.innerHTML = "";
+                    
+                    publishBtn.innerText = "Partager";
+                    publishBtn.disabled = false;
+                    
+                    // Retour automatique sur le flux d'actualité pour voir son œuvre
+                    switchView("view-feed");
+                });
+            });
+        }
+    );
+}
 // ==========================================
 function handlePublish() {
     const fileSelector = document.getElementById("file-selector");
