@@ -12,6 +12,13 @@
     <link rel="stylesheet" href="style.css">
 </<script src="reels.js" defer></script>>
 <body>
+    <!-- Configuration Application Mobile Mobile PWA -->
+    <link rel="manifest" href="manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js');
+      }
+    </script>
 <script src="communications.js" defer></script>
     <!-- APPLICATION CONTAINER -->
     <div class="app-container">
