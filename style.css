@@ -294,3 +294,11 @@ body {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+.upload-box input[type="file"] {
+    background: #262626;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px dashed var(--insta-blue);
+    cursor: pointer;
+    color: var(--insta-text-muted);
+}
