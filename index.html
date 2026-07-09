@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QG des élus - Réseau Actif</title>
+    <!-- Moteurs de communication réseau Firebase v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        :root {
+            --bg-color: #0c0c12;
+            --card-color: #141424;
+            --accent-color: #ffd700;
+            --text-color: #ffffff;
+            --text-secondary: #8e8e12;
+            --text-muted: #8c8c9e;
+            --success-color: #00e676;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 0;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; overflow: hidden;
+        }
+
+        .screen {
+            display: none; width: 100%; max-width: 480px;
+            background-color: var(--card-color); padding: 30px;
+            border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.7);
+            box-sizing: border-box; animation: fadeIn 0.4s ease;
+        }
+        .active-screen { display: block; }
+        h2, h3 { color: var(--accent-color); text-align: center; margin-top: 0; }
+        
+        input, select {
+            width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px;
+            border: 1px solid #2d2d44; background-color: #1e1e2f; color: #fff;
+            box-sizing: border-box; font-size: 14px;
+        }
+
+        button {
+            width: 100%; padding: 12px; background-color: var(--accent-color);
+            color: #0c0c12; border: none; border-radius: 10px;
+            font-weight: bold; font-size: 14px; cursor: pointer;
+        }
+
+        .qg-app {
+            width: 100%; max-width: 480px; height: 100vh;
+            background: var(--card-color); display: flex; flex-direction: column; position: relative;
+        }
+
+        .qg-header {
+            background: #1b1b2a; padding: 12px 15px; display: flex;
+            justify-content: space-between; align-items: center; border-bottom: 1px solid #2d2d44; z-index: 20;
+        }
+        .brand-title { font-weight: bold; color: var(--accent-color); font-size: 18px; cursor: pointer; }
+        .header-actions { display: flex; gap: 6px; }
+        .action-icon-btn {
+            background: #27273d; color: white; padding: 8px 10px;
+            font-size: 11px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold;
+        }
+
+        .satellite-bar {
+            background: #12121a; padding: 6px 15px; font-size: 10.5px;
+            color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .chat-space {
+            flex: 1; padding: 15px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .msg {
+            background: #1e1e32; padding: 12px; border-radius: 14px;
+            max-width: 85%; width: fit-content; font-size: 14px; line-height: 1.4;
+        }
+        .msg.me { background: #2d2d48; align-self: flex-end; border-right: 4px solid var(--accent-color); }
+        .msg.other { background: #1e1e32; align-self: flex-start; }
+        .msg.game { background: #1a237e; align-self: center; border: 1px solid var(--accent-color); text-align: center; width: 90%; }
+        .msg.anonymous { background: #37474f; align-self: center; border-left: 4px solid #b0bec5; width: 90%; font-style: italic; }
+        .msg-meta { font-size: 10px; color: var(--accent-color); margin-bottom: 4px; font-weight: bold; }
+
+        .view-overlay {
+            display: none; position: absolute; top: 52px; left: 0; right: 0; bottom: 60px;
+            background: #0f0f17; z-index: 15; padding: 20px; overflow-y: auto;
+        }
+        .view-overlay h3 { border-bottom: 1px solid #2d2d44; padding-bottom: 8px; }
+
+        .secret-lox-panel {
+            display: none; background: linear-gradient(135deg, #15002b, #050010);
+            padding: 12px; border-top: 2px dashed #bc00dd;
+        }
+        .lox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+        .lox-btn { background: #7b1fa2; color: white; font-size: 11px; padding: 8px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+
+        .footer-communication {
+            padding: 10px; background: #161624; border-top: 1px solid #2d2d44;
+            display: flex; flex-direction: column; gap: 6px; z-index: 20;
+        }
+        .input-row { display: flex; gap: 6px; width: 100%; }
+        .input-row input { margin: 0; flex: 1; border-radius: 8px; padding: 10px; }
+        .input-row button { margin: 0; width: auto; border-radius: 8px; }
+
+        .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+        .grid-card { background: #1a1a2e; padding: 10px; border-radius: 10px; border: 1px solid #2d2d44; text-align: center; font-size: 12px; cursor: pointer; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <!-- ÉCRAN 1 : FORMALITÉS D'ENTRÉE -->
+    <div id="screenRegister" class="screen active-screen">
+        <h2>QG des élus 👑</h2>
+        <form onsubmit="executeOnboarding(event)">
+            <input type="text" id="regPseudo" placeholder="Pseudo" required>
+            <input type="text" id="regPhoto" placeholder="Photo de profil" required value="Avatar_Elu.png">
+            <input type="text" id="regNationality" placeholder="Nationalité" required value="Togolaise">
+            <input type="text" id="regResidence" placeholder="Pays de résidence" required value="Togo">
+            <input type="date" id="regBirth" required value="2007-01-17">
+            <input type="text" id="regArtist" placeholder="Artiste préféré" required value="Lomepal">
+            <button type="submit" style="margin-top:10px;">Open</button>
+        </form>
+    </div>
+
+    <!-- ÉCRAN 2 : ACCUEIL MATRICE -->
+    <div id="screenWelcome" class="screen">
+        <div style="text-align:center; padding:20px 0; font-size:18px; color:var(--accent-color);">
+            <p>Connexion au canal de la matrice...</p>
+            <p>« L'amitié, si elle est bien entretenue et respectée, vaut de l'or 😊✨ »</p>
+        </div>
+    </div>
+
+    <!-- ÉCRAN 3 : INTERFACE DE DISCUSSION & MODULES -->
+    <div id="screenQG" class="qg-app" style="display: none;">
+        <div class="qg-header">
+            <div class="brand-title" onclick="closeAllOverlays()">QG des élus 🃏</div>
+            <div class="header-actions">
+                <button class="action-icon-btn" style="background:#00e676; color:black;" onclick="openView('viewInbox')">💬 Inbox</button>
+                <button class="action-icon-btn" style="background:#0288d1; color:white;" onclick="openView('viewGames')">🎮 Modules</button>
+                <button class="action-icon-btn" style="background:var(--accent-color); color:black;" onclick="openView('viewAdmin')">⚙️ Admin</button>
+            </div>
+        </div>
+
+        <div class="satellite-bar">
+            <span id="satDate">Date</span><span id="satTime" style="font-weight:bold; color:white;">00:00</span><span>📍 En Ligne</span>
+        </div>
+
+        <div class="chat-space" id="mainChatBox"></div>
+
+        <!-- OUTILS ET JEUX EN SURCOUCHE -->
+        <div id="viewInbox" class="view-overlay">
+            <h3>📥 Inbox Confidentiel Privé</h3>
+            <input type="text" id="targetUser" placeholder="Pseudo de l'ami...">
+            <button onclick="alert('Canal confidentiel actif.')">Ouvrir l'Inbox</button>
+        </div>
+
+        <div id="viewGames" class="view-overlay">
+            <h3>🎮 Espace Jeux & Intimité</h3>
+            <div class="feature-grid">
+                <div class="grid-card" onclick="triggerDevinette()">🧠 Devinette Numérique</div>
+                <div class="grid-card" onclick="triggerActionVerite()">🔥 Action ou Vérité</div>
+                <div class="grid-card" style="grid-column: span 2; background:#37474f;" onclick="triggerAnonymeMode()">🤫 On écoute mais on ne juge pas</div>
+            </div>
+            <button style="background:#00e5ff; color:black; font-size:12px; padding:8px;" onclick="alert('Indice : Concentrez-vous sur l\'essentiel.')">Utiliser le Bouton Indice "🃏"</button>
+        </div>
+
+        <div id="viewAdmin" class="view-overlay">
+            <h3>⚙️ Panneau Administrateur</h3>
+            <button onclick="executeLoxAction('purgetotal')" style="background:#d32f2f; color:white;">Vider le salon de discussion</button>
+        </div>
+
+        <!-- PANEL SECRET LOX CONSOLE FLUX -->
+        <div id="loxCorePanel" class="secret-lox-panel">
+            <div style="font-size:11px; color:#bc00dd; font-weight:bold; text-align:center;">⚠️ CONSOLE RACINE LOX</div>
+            <div class="lox-grid">
+                <button class="lox-btn" style="background:#4a00e0;" onclick="executeLoxAction('purgetotal')">💥 Purge Cloud</button>
+                <button class="lox-btn" style="background:#ff007f;" onclick="alert('Mode invisible actif.')">👻 Mode Fantôme</button>
+                <button class="lox-btn" style="background:#ff1212;" onclick="document.getElementById('loxCorePanel').style.display='none'"> Verrouiller</button>
+            </div>
+        </div>
+
+        <div class="footer-communication">
+            <div class="input-row">
+                <button style="background:#00a2ff; color:white; font-size:12px;" onclick="askGemini()">🤖 IA</button>
+                <input type="text" id="chatInput" placeholder="Écrire un message...">
+                <button style="background:var(--accent-color);" onclick="sendText()">Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION PRE-REMPLIE FIREBASE
+        // ==========================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyBJh3g7XLYFcQNOrUjLGeJjM1QfS85TxAE",
+  authDomain: "qg-des-elus.firebaseapp.com",
+  databaseURL: "https://qg-des-elus-default-rtdb.firebaseio.com",
+  projectId: "qg-des-elus",
+  storageBucket: "qg-des-elus.firebasestorage.app",
+  messagingSenderId: "148573728545",
+  appId: "1:148573728545:web:49a41c8d69a8bd4e37d860",
+  measurementId: "G-H6FQ9MY1NG"
+};
+        
+        // Initialisation automatique
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const chatRef = database.ref('messages');
+
+        let identity = {};
+
+        function executeOnboarding(event) {
+            event.preventDefault();
+            identity.pseudo = document.getElementById('regPseudo').value;
+            document.getElementById('screenRegister').classList.remove('active-screen');
+            document.getElementById('screenWelcome').classList.add('active-screen');
+
+            setTimeout(() => {
+                document.getElementById('screenWelcome').style.display = "none";
+                document.getElementById('screenQG').style.display = "flex";
+                
+                // ÉCOUTE PERMANENTE DU SERVEUR CLOUD
+                chatRef.on('value', (snapshot) => {
+                    const box = document.getElementById('mainChatBox');
+                    box.innerHTML = ""; 
+                    const data = snapshot.val();
+                    if(data) {
+                        Object.values(data).forEach(msg => {
+                            renderMessage(msg.sender, msg.text, msg.type);
+                        });
+                    }
+                    box.scrollTop = box.scrollHeight;
+                });
+
+                setInterval(() => {
+                    document.getElementById('satTime').innerText = new Date().toLocaleTimeString('fr-FR');
+                    document.getElementById('satDate').innerText = new Date().toLocaleDateString('fr-FR', {weekday:'short', day:'numeric'});
+                }, 1000);
+            }, 2500);
+        }
+
+        function openView(id) {
+            const views = ['viewInbox', 'viewGames', 'viewAdmin'];
+            views.forEach(v => document.getElementById(v).style.display = (v === id && document.getElementById(v).style.display !== 'block') ? 'block' : 'none');
+        }
+        function closeAllOverlays() { openView(''); }
+
+        function sendText() {
+            const input = document.getElementById('chatInput');
+            const txt = input.value.trim();
+            if(!txt) return;
+
+            // Commande Secrète exclusive à Roméo
+            if (txt === "le lâche prise" && identity.pseudo === "Roméo") {
+                input.value = '';
+                document.getElementById('loxCorePanel').style.display = "block";
+                return;
+            }
+
+            chatRef.push().set({ sender: identity.pseudo, text: txt, type: 'standard' });
+            input.value = '';
+        }
+
+        function renderMessage(sender, text, type) {
+            const box = document.getElementById('mainChatBox');
+            const d = document.createElement('div');
+            d.classList.add('msg');
+            
+            if (type === 'anon') d.classList.add('anonymous');
+            else if (type === 'game') d.classList.add('game');
+            else if (sender === identity.pseudo) d.classList.add('me');
+            else d.classList.add('other');
+
+            d.innerHTML = `<div class="msg-meta">${sender}</div><div>${text}</div>`;
+            box.appendChild(d);
+        }
+
+        function triggerDevinette() {
+            closeAllOverlays();
+            chatRef.push().set({ sender: "🎲 JEU", text: "<b>DEVINETTE :</b> Je suis une technologie antique de construction qui pouvait durcir même sous l'eau. Que suis-je ?", type: 'game' });
+        }
+
+        function triggerActionVerite() {
+            closeAllOverlays();
+            chatRef.push().set({ sender: "🔥 JEU", text: "<b>VÉRITÉ :</b> Quel est le secret le plus fou caché dans ton téléphone ?", type: 'game' });
+        }
+
+        function triggerAnonymeMode() {
+            closeAllOverlays();
+            const confession = prompt("Ta confession secrète :");
+            if (confession) chatRef.push().set({ sender: "🤫 CONFESSION", text: `« ${confession} »`, type: 'anon' });
+        }
+
+        function executeLoxAction(action) {
+            if (action === 'purgetotal') chatRef.set(null); 
+        }
+
+        function askGemini() { alert("Le module IA local est en veille réseau."); }
+    </script>
+</body>
+</html>
